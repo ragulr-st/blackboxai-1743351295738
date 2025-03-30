@@ -6,6 +6,10 @@ class Contract < ApplicationRecord
   end
 
   def self.upload_and_analyze(file)
+    unless Rails.application.credentials.gemini_api_key.present?
+      raise "Gemini API key not configured. Please check your credentials."
+    end
+
     # Extract text from PDF
     response = HTTParty.post(
       "http://103.16.202.150:8080/upload_contract",
@@ -13,18 +17,21 @@ class Contract < ApplicationRecord
       headers: { 'Content-Type' => 'multipart/form-data' }
     )
 
-    if response.success?
-      extracted_text = response.body.force_encoding("UTF-8")
-      
-      # Get contract type from Gemini
-      uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-002:generateContent?key=#{Rails.application.credentials.gemini_api_key}")
-      request_body = {
-        "contents" => [{
-          "parts" => [{
-            "text" => "You are an AI contract expert. Identify the type of contract below and provide a brief description:\n\n#{extracted_text}"
-          }]
+    unless response.success?
+      raise "Failed to extract text from PDF: #{response.code} - #{response.message}"
+    end
+
+    extracted_text = response.body.force_encoding("UTF-8")
+    
+    # Get contract type from Gemini
+    uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-002:generateContent?key=#{Rails.application.credentials.gemini_api_key}")
+    request_body = {
+      "contents" => [{
+        "parts" => [{
+          "text" => "You are an AI contract expert. Identify the type of contract below and provide a brief description:\n\n#{extracted_text}"
         }]
-      }
+      }]
+    }
 
       contract_type_response = send_gemini_request(uri, request_body)
       contract_type = contract_type_response.dig("candidates", 0, "content", "parts", 0, "text")
@@ -62,8 +69,26 @@ class Contract < ApplicationRecord
     request.body = request_body.to_json
 
     response = http.request(request)
-    JSON.parse(response.body)
-  rescue JSON::ParserError, Net::HTTPError => e
-    raise "Failed to process with Gemini API: #{e.message}"
+    
+    unless response.is_a?(Net::HTTPSuccess)
+      error_body = JSON.parse(response.body) rescue nil
+      error_message = error_body&.dig("error", "message") || response.message
+      raise "Gemini API error (#{response.code}): #{error_message}"
+    end
+
+    parsed_response = JSON.parse(response.body)
+    
+    unless parsed_response["candidates"]&.any? && 
+           parsed_response["candidates"][0]["content"]&.dig("parts", 0, "text")
+      raise "Invalid response format from Gemini API"
+    end
+
+    parsed_response
+  rescue JSON::ParserError => e
+    raise "Failed to parse Gemini API response: #{e.message}"
+  rescue Net::HTTPError => e
+    raise "Network error with Gemini API: #{e.message}"
+  rescue StandardError => e
+    raise "Error processing Gemini API request: #{e.message}"
   end
 end
