@@ -2,9 +2,8 @@ class Contract < ApplicationRecord
   validates :content, presence: true
 
   def preview
-    content.to_s
+    summary.presence || content.to_s
   end
-
 
   def self.upload_and_analyze(file)
     # Extract text from PDF
