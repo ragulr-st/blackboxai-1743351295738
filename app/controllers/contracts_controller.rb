@@ -13,14 +13,24 @@ class ContractsController < ApplicationController
   end
 
   def create
-    if params[:contract][:file].present?
+    puts "Received params: #{params.inspect}"  # Debugging log
+    puts "Received file: #{params[:contract][:file].inspect}"  # Debugging log
+    contract_file = params.dig(:contract, :file)
+
+    p contract_file  # Debugging log
+    puts "Contract file: #{contract_file.inspect}"  # Debugging log
+
+    if contract_file.present?
       begin
         @contract = Contract.upload_and_analyze(params[:contract][:file])
         redirect_to @contract, notice: "Contract was successfully analyzed."
       rescue StandardError => e
+        puts "Error processing contract: #{e.message}"  # Debugging log
+        ffff
         redirect_to new_contract_path, alert: "Error processing contract: #{e.message}"
       end
     else
+      hhhhh
       redirect_to new_contract_path, alert: "Please select a PDF file to upload."
     end
   end
