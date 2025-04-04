@@ -1,61 +1,191 @@
 class Contract < ApplicationRecord
   validates :content, presence: true
 
+  GEMINI_KEY = "AIzaSyCpmi_nX_mlX1BqbfBdau4mwoBw9GkwkAo"
+
   def preview
     summary.presence || content.to_s
   end
 
   def self.upload_and_analyze(file)
-    unless Rails.application.credentials.gemini_api_key.present?
-      raise "Gemini API key not configured. Please check your credentials."
-    end
-
+    puts "-----------------fffffffffffff--------------------------"+file.to_s
+  
     # Extract text from PDF
     response = HTTParty.post(
       "http://103.16.202.150:8080/upload_contract",
       body: { file: file },
-      headers: { 'Content-Type' => 'multipart/form-data' }
+      headers: { 'Content-Type' => 'multipart/form-data' },
+      timeout: 180 # Increase timeout to 60 seconds
     )
-
+  
     unless response.success?
       raise "Failed to extract text from PDF: #{response.code} - #{response.message}"
     end
-
-    extracted_text = response.body.force_encoding("UTF-8")
-    
+  
+    extracted_text = response.body.force_encoding("UTF-8")  # ✅ Move this outside `unless`
+    p extracted_text
+  
+  
     # Get contract type from Gemini
-    uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-1.5-pro-002:generateContent?key=#{Rails.application.credentials.gemini_api_key}")
+    uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=#{GEMINI_KEY}")
     request_body = {
       "contents" => [{
         "parts" => [{
-          "text" => "You are an AI contract expert. Identify the type of contract below and provide a brief description:\n\n#{extracted_text}"
+          "text" => "You are a legal document classifier. From the following contract text, identify ONLY these two pieces of information:
+1. Contract Type: What specific type of legal agreement is this? (e.g., employment, lease, loan, NDA, etc.)
+2. Locality/Jurisdiction: What geographic location (city, state, country) governs this agreement, if specified?
+
+Provide only these two data points in the format:
+- Type: [contract type]
+- Locality: [jurisdiction or 'Not specified' if absent]
+
+Contract text:
+#{extracted_text}"
         }]
       }]
     }
+  
+    #contract_type_response = send_gemini_request(uri, request_body)
+    #contract_type = contract_type_response.dig("candidates", 0, "content", "parts", 0, "text")
+  
+    # Generate detailed summary
+    summary_request_body = {
+      "contents" => [{
+        "parts" => [{
+          "text" => <<~PROMPT
+          You are an expert legal contract analyst with extensive experience in summarizing, extracting, and analyzing contract terms and obligations. Your task is to analyze the provided contract and extract all relevant details in a structured, clause-wise format with precise categorization. Ensure that no obligations, clauses, or important details are missed.
 
-      contract_type_response = send_gemini_request(uri, request_body)
-      contract_type = contract_type_response.dig("candidates", 0, "content", "parts", 0, "text")
+Please provide the analysis strictly in the following JSON format:
 
-      # Generate detailed summary
-      summary_request_body = {
-        "contents" => [{
-          "parts" => [{
-            "text" => "You are a legal AI expert. Provide a detailed analysis of the following #{contract_type} contract, including key terms, obligations, risks, and important clauses:\n\n#{extracted_text}"
-          }]
+```json
+{
+  "ContractIdentification": {
+    "ContractTitle": "",
+    "ContractType": "",
+    "Purpose": "",
+    "PartiesInvolved": {
+      "Obligor": "",
+      "Obligee": "",
+      "ThirdPartyBeneficiaries": []
+    },
+    "ContractExecutionDate": "",
+    "ContractDuration": "",
+    "Version": "",
+    "Background": ""
+  },
+  "DefinitionsAndInterpretations": {
+    "DefinedTerms": {},
+    "InterpretationRules": "",
+    "Clarifications": ""
+  },
+  "Clauses": [
+    {
+      "ClauseName": "",
+      "FullText": "",
+      "KeyObligations": "",
+      "Category": "",
+      "SubClauses": [],
+      "ImportanceAssessment": ""
+    }
+  ],
+  "ObligationsAndResponsibilities": {
+    "Obligations": [],
+    "Categories": {
+      "Legal": [],
+      "Financial": [],
+      "Operational": []
+    },
+    "References": [],
+    "Prioritization": []
+  },
+  "FinancialTerms": {
+    "PaymentStructure": "",
+    "Pricing": "",
+    "Currency": "",
+    "Penalties": "",
+    "RefundPolicies": ""
+  },
+  "RiskAndLiabilities": {
+    "LiabilityLimitations": "",
+    "RiskFactors": {
+      "Financial": "",
+      "Operational": "",
+      "Legal": ""
+    },
+    "Indemnification": ""
+  },
+  "ServiceLevelAgreements": {
+    "PerformanceObligations": "",
+    "ConsequencesOfBreaches": "",
+    "MonitoringMechanisms": ""
+  },
+  "TerminationAndRenewal": {
+    "TerminationRights": "",
+    "NoticePeriod": "",
+    "RenewalConditions": ""
+  },
+  "GoverningLawAndCompliance": {
+    "GoverningLaw": "",
+    "DisputeResolution": "",
+    "ComplianceObligations": ""
+  },
+  "ConfidentialityAndSecurity": {
+    "ConfidentialityObligations": "",
+    "DataSecurityRequirements": ""
+  },
+  "ChangeManagement": {
+    "ChangeProcedures": "",
+    "ImpactAssessment": ""
+  },
+  "AssignmentAndSubcontracting": {
+    "AssignmentProvisions": "",
+    "SubcontractingProvisions": ""
+  },
+  "InsuranceRequirements": {
+    "InsuranceObligations": "",
+    "CoverageRequirements": ""
+  },
+  "RepresentationsAndWarranties": {
+    "Representations": "",
+    "Warranties": ""
+  },
+  "NoticeRequirements": {
+    "NotificationMethods": "",
+    "Timeframes": ""
+  },
+  "ForceMajeureAndExceptions": {
+    "ForceMajeure": "",
+    "CarveOuts": ""
+  },
+  "AuditRights": {
+    "AuditScope": ""
+  },
+  "ESGObligations": {
+    "Responsibilities": ""
+  },
+  "TechnologyAndDataUse": {
+    "DataUsageRights": ""
+  },
+  "CrossReferences": {
+    "Checks": ""
+  }
+}
+
+find the contract details #{extracted_text}
+ 
+          PROMPT
         }]
-      }
-
-      summary_response = send_gemini_request(uri, summary_request_body)
-      summary = summary_response.dig("candidates", 0, "content", "parts", 0, "text")
-
-      create(
-        content: extracted_text,
-        contract_type: contract_type,
-        summary: summary
-      )
-    else
-      raise "Failed to extract text from PDF: #{response.code} - #{response.message}"
-    end
+      }]
+    }
+  
+    summary_response = send_gemini_request(uri, summary_request_body)
+    summary = summary_response.dig("candidates", 0, "content", "parts", 0, "text")  
+   
+    create(
+      content: extracted_text,
+      contract_type: "contract_type",
+      summary: summary
+    )
   end
 
   private

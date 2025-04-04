@@ -34,7 +34,7 @@
                     <%= contract.contract_type %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
-                    <%= contract.summary %>
+                    <%= truncate(contract.summary, length: 50) %>
                   </td>
                   <td class="whitespace-nowrap px-3 py-4 text-sm text-gray-500">
                     <%= truncate(contract.preview, length: 50) %>

@@ -1,5 +1,5 @@
 <div class="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
-  <%= form_with(model: contract, class: "space-y-6") do |form| %>
+  <%= form_with(model: contract, class: "space-y-6" , html: { multipart: true }) do |form| %>
     <% if contract.errors.any? %>
       <div class="bg-red-50 p-4 rounded-md">
         <h2 class="text-red-800 text-lg font-medium mb-2">
@@ -23,6 +23,7 @@
               <p class="text-xs text-gray-500">PDF files only</p>
             </div>
             <%= form.file_field :file, 
+                id: "contract_file",
                 class: "hidden", 
                 accept: "application/pdf",
                 data: {
