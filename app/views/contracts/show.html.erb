@@ -17,6 +17,11 @@
       <div class="flex justify-between items-center">
         <h3 class="text-2xl font-bold leading-6 text-gray-900">Contract Analysis</h3>
         <div class="flex space-x-4">
+          <button id="openPromptModal" 
+                  class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
+            <i class="fas fa-comment-alt mr-2"></i> Ask a Question
+          </button>
+          
           <%= link_to edit_contract_path(@contract), 
               class: "inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" do %>
             <i class="fas fa-edit mr-2"></i> Edit
@@ -32,6 +37,24 @@
 
     <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
       <dl class="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
+        <div class="sm:col-span-1">
+          <dt class="text-sm font-medium text-gray-500">Output Format</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+              <%= @contract.output_format %>
+            </span>
+          </dd>
+        </div>
+
+        <div class="sm:col-span-1">
+          <dt class="text-sm font-medium text-gray-500">LLM Provider</dt>
+          <dd class="mt-1 text-sm text-gray-900">
+            <span class="inline-flex items-center px-3 py-0.5 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <%= @contract.llm_provider %>
+            </span>
+          </dd>
+        </div>
+
         <div class="sm:col-span-1">
           <dt class="text-sm font-medium text-gray-500">Contract Type</dt>
           <dd class="mt-1 text-sm text-gray-900">
@@ -54,7 +77,14 @@
             <%= simple_format(@contract.summary, class: "whitespace-pre-wrap") %>
           </dd>
         </div>
+
+        <!-- Prompt Response Container -->
+        <div id="promptResponse" class="sm:col-span-2">
+          <!-- Dynamic content will be inserted here by JavaScript -->
+        </div>
       </dl>
     </div>
   </div>
 </div>
+
+<%= render 'prompt_modal' %>

@@ -1,10 +1,124 @@
+require 'net/http'
+require 'json'
+
 class Contract < ApplicationRecord
   validates :content, presence: true
+  validates :output_format, presence: true, inclusion: { in: %w[PDF Word Excel HTML JSON] }
+  validates :llm_provider, presence: true, inclusion: { in: %w[ChatGPT Claude Gemini] }
 
   GEMINI_KEY = "AIzaSyCpmi_nX_mlX1BqbfBdau4mwoBw9GkwkAo"
+  ALLOWED_OUTPUT_FORMATS = %w[PDF Word Excel HTML JSON].freeze
+  ALLOWED_LLM_PROVIDERS = %w[ChatGPT Claude Gemini].freeze
 
   def preview
     summary.presence || content.to_s
+  end
+
+  def process_custom_prompt(prompt_text)
+    uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=#{GEMINI_KEY}")
+    
+    # Adjust the prompt based on output format
+    formatted_prompt = format_prompt_for_output(prompt_text)
+    
+    request_body = {
+      "contents" => [{
+        "parts" => [{
+          "text" => "#{formatted_prompt}\n\nContract text:\n#{content}"
+        }]
+      }]
+    }
+
+    response = send_gemini_request(uri, request_body)
+    response.dig("candidates", 0, "content", "parts", 0, "text")
+  end
+
+  private
+
+  def format_prompt_for_output(prompt_text)
+    base_prompt = case output_format
+    when 'JSON'
+      "Please provide the response in valid JSON format."
+    when 'HTML'
+      "Please provide the response in HTML format with appropriate tags and styling."
+    when 'PDF', 'Word'
+      "Please provide the response in a well-structured document format with clear headings and paragraphs."
+    when 'Excel'
+      "Please provide the response in a tabular format suitable for Excel, with clear column headers and structured data."
+    end
+
+    "#{prompt_text}\n\n#{base_prompt}"
+  end
+
+  def self.send_gemini_request(uri, request_body)
+    puts "-----------------request_body--------------------------"+request_body.to_s
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    
+    request = Net::HTTP::Post.new(uri)
+    request["Content-Type"] = "application/json"
+    request.body = request_body.to_json
+
+    response = http.request(request)
+    p response
+    
+    unless response.is_a?(Net::HTTPSuccess)
+      error_body = JSON.parse(response.body) rescue nil
+      error_message = error_body&.dig("error", "message") || response.message
+      puts "-----------------error_message--------------------------"+error_message.to_s
+      fffff
+      raise "Gemini API error (#{response.code}): #{error_message}"
+    end
+
+    parsed_response = JSON.parse(response.body)
+    
+    unless parsed_response["candidates"]&.any? && 
+           parsed_response["candidates"][0]["content"]&.dig("parts", 0, "text")
+      raise "Invalid response format from Gemini API"
+    end
+
+    parsed_response
+  rescue JSON::ParserError => e
+    raise "Failed to parse Gemini API response: #{e.message}"
+  rescue Net::HTTPError => e
+    raise "Network error with Gemini API: #{e.message}"
+  rescue StandardError => e
+    raise "Error processing Gemini API request: #{e.message}"
+  end
+
+  def send_gemini_request(uri, request_body)
+    puts "-----------------request_body--------------------------"+request_body.to_s
+    http = Net::HTTP.new(uri.host, uri.port)
+    http.use_ssl = true
+    
+    request = Net::HTTP::Post.new(uri)
+    request["Content-Type"] = "application/json"
+    request.body = request_body.to_json
+
+    response = http.request(request)
+    p response
+    
+    unless response.is_a?(Net::HTTPSuccess)
+      error_body = JSON.parse(response.body) rescue nil
+      error_message = error_body&.dig("error", "message") || response.message
+      puts "-----------------error_message--------------------------"+error_message.to_s
+      fffff
+      raise "Gemini API error (#{response.code}): #{error_message}"
+    end
+
+    parsed_response = JSON.parse(response.body)
+    
+    unless parsed_response["candidates"]&.any? && 
+           parsed_response["candidates"][0]["content"]&.dig("parts", 0, "text")
+      raise "Invalid response format from Gemini API"
+    end
+
+    parsed_response
+  rescue JSON::ParserError => e
+    raise "Failed to parse Gemini API response: #{e.message}"
+  rescue Net::HTTPError => e
+    raise "Network error with Gemini API: #{e.message}"
+  rescue StandardError => e
+    raise "Error processing Gemini API request: #{e.message}"
   end
 
   def self.upload_and_analyze(file)
@@ -23,33 +137,10 @@ class Contract < ApplicationRecord
     end
   
     extracted_text = response.body.force_encoding("UTF-8")  # ✅ Move this outside `unless`
-    p extracted_text
-  
-  
-    # Get contract type from Gemini
-    uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=#{GEMINI_KEY}")
-    request_body = {
-      "contents" => [{
-        "parts" => [{
-          "text" => "You are a legal document classifier. From the following contract text, identify ONLY these two pieces of information:
-1. Contract Type: What specific type of legal agreement is this? (e.g., employment, lease, loan, NDA, etc.)
-2. Locality/Jurisdiction: What geographic location (city, state, country) governs this agreement, if specified?
+    puts"coming from gemini"+extracted_text.to_s
 
-Provide only these two data points in the format:
-- Type: [contract type]
-- Locality: [jurisdiction or 'Not specified' if absent]
-
-Contract text:
-#{extracted_text}"
-        }]
-      }]
-    }
-  
-    #contract_type_response = send_gemini_request(uri, request_body)
-    #contract_type = contract_type_response.dig("candidates", 0, "content", "parts", 0, "text")
-  
     # Generate detailed summary
-    summary_request_body = {
+  summary_request_body = {
       "contents" => [{
         "parts" => [{
           "text" => <<~PROMPT
@@ -57,7 +148,6 @@ Contract text:
 
 Please provide the analysis strictly in the following JSON format:
 
-```json
 {
   "ContractIdentification": {
     "ContractTitle": "",
@@ -81,10 +171,10 @@ Please provide the analysis strictly in the following JSON format:
   "Clauses": [
     {
       "ClauseName": "",
-      "FullText": "",
+      "ShortSummary": "",
       "KeyObligations": "",
       "Category": "",
-      "SubClauses": [],
+      "SubClauses summary": "",
       "ImportanceAssessment": ""
     }
   ],
@@ -176,49 +266,22 @@ find the contract details #{extracted_text}
           PROMPT
         }]
       }]
-    }
+}
+
+    uri = URI("https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash-lite:generateContent?key=#{GEMINI_KEY}")
   
     summary_response = send_gemini_request(uri, summary_request_body)
     summary = summary_response.dig("candidates", 0, "content", "parts", 0, "text")  
+    puts "-----------------summary_response--------------------------"+summary_response.to_s
+
+    
    
     create(
       content: extracted_text,
       contract_type: "contract_type",
-      summary: summary
+      summary: summary,
+      summary_json: summary
     )
-  end
-
-  private
-
-  def self.send_gemini_request(uri, request_body)
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl = true
-    
-    request = Net::HTTP::Post.new(uri)
-    request["Content-Type"] = "application/json"
-    request.body = request_body.to_json
-
-    response = http.request(request)
-    
-    unless response.is_a?(Net::HTTPSuccess)
-      error_body = JSON.parse(response.body) rescue nil
-      error_message = error_body&.dig("error", "message") || response.message
-      raise "Gemini API error (#{response.code}): #{error_message}"
-    end
-
-    parsed_response = JSON.parse(response.body)
-    
-    unless parsed_response["candidates"]&.any? && 
-           parsed_response["candidates"][0]["content"]&.dig("parts", 0, "text")
-      raise "Invalid response format from Gemini API"
-    end
-
-    parsed_response
-  rescue JSON::ParserError => e
-    raise "Failed to parse Gemini API response: #{e.message}"
-  rescue Net::HTTPError => e
-    raise "Network error with Gemini API: #{e.message}"
-  rescue StandardError => e
-    raise "Error processing Gemini API request: #{e.message}"
+    hhhhh
   end
 end

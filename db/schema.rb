@@ -10,12 +10,15 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_03_29_074358) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_07_143915) do
   create_table "contracts", force: :cascade do |t|
     t.text "content"
     t.string "contract_type"
     t.text "summary"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "output_format", default: "JSON", null: false
+    t.string "llm_provider", default: "Gemini", null: false
+    t.json "summary_json"
   end
 end
