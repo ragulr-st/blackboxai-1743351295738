@@ -183,7 +183,8 @@ Please provide the analysis strictly in the following JSON format:
     "Categories": {
       "Legal": [],
       "Financial": [],
-      "Operational": []
+      "Operational": [],
+      "other": []
     },
     "References": [],
     "Prioritization": []
@@ -278,10 +279,19 @@ find the contract details #{extracted_text}
    
     create(
       content: extracted_text,
-      contract_type: "contract_type",
+      contract_type: "determine_contract_type(summary)",
       summary: summary,
       summary_json: summary
     )
-    hhhhh
+  end
+  def self.determine_contract_type(summary)
+    begin
+      clean_data = summary.gsub(/```json|```/, '')
+      json_data = JSON.parse(clean_data)
+      contract_type = json_data.dig("ContractIdentification", "ContractType")
+      contract_type.presence || "Unknown"
+    rescue JSON::ParserError
+      "Unknown"
+    end
   end
 end

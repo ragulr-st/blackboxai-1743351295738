@@ -72,11 +72,64 @@
         </div>
 
         <div class="sm:col-span-2">
-          <dt class="text-sm font-medium text-gray-500">Contract Summary</dt>
-          <dd class="mt-1 text-sm text-gray-900 prose max-w-none">
-            <%= simple_format(@contract.summary, class: "whitespace-pre-wrap") %>
-          </dd>
-        </div>
+        <dt class="text-sm font-medium text-gray-500">Contract Analysis</dt>
+        <dd class="mt-1 text-sm text-gray-900 prose max-w-none">
+          <% @json_data.each do |section_name, section_data| %>
+            <div class="mb-6">
+              <h3 class="text-lg font-semibold text-gray-900 mb-3">
+                <%= section_name.to_s.gsub(/(?=[A-Z])/, ' ') %>
+              </h3>
+              
+              <div class="pl-4">
+                <% case section_data %>
+                <% when Hash %>
+                  <% section_data.each do |key, value| %>
+                    <% if value.is_a?(Hash) %>
+                      <div class="mb-3">
+                        <h4 class="text-md font-medium text-gray-700 mb-2">
+                          <%= key.to_s.gsub(/(?=[A-Z])/, ' ') %>
+                        </h4>
+                        <div class="pl-4">
+                          <% value.each do |sub_key, sub_value| %>
+                            <div class="mb-1">
+                              <span class="font-medium"><%= sub_key.to_s.gsub(/(?=[A-Z])/, ' ') %>:</span>
+                              <span class="text-gray-600"><%= sub_value %></span>
+                            </div>
+                          <% end %>
+                        </div>
+                      </div>
+                    <% else %>
+                      <div class="mb-1">
+                        <span class="font-medium"><%= key.to_s.gsub(/(?=[A-Z])/, ' ') %>:</span>
+                        <span class="text-gray-600"><%= value %></span>
+                      </div>
+                    <% end %>
+                  <% end %>
+                <% when Array %>
+                  <% section_data.each do |item| %>
+                    <% if item.is_a?(Hash) %>
+                      <div class="mb-3 pl-4">
+                        <% item.each do |key, value| %>
+                          <div class="mb-1">
+                            <span class="font-medium"><%= key.to_s.gsub(/(?=[A-Z])/, ' ') %>:</span>
+                            <span class="text-gray-600"><%= value %></span>
+                          </div>
+                        <% end %>
+                      </div>
+                    <% else %>
+                      <div class="mb-1 pl-4">
+                        <span class="text-gray-600">• <%= item %></span>
+                      </div>
+                    <% end %>
+                  <% end %>
+                <% else %>
+                  <div class="text-gray-600"><%= section_data %></div>
+                <% end %>
+              </div>
+            </div>
+          <% end %>
+        </dd>
+      </div>
 
         <!-- Prompt Response Container -->
         <div id="promptResponse" class="sm:col-span-2">

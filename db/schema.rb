@@ -10,7 +10,16 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_04_07_143915) do
+ActiveRecord::Schema[8.0].define(version: 2025_04_09_042818) do
+  create_table "contract_prompts", force: :cascade do |t|
+    t.integer "contract_id", null: false
+    t.text "prompt_text"
+    t.text "response"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["contract_id"], name: "index_contract_prompts_on_contract_id"
+  end
+
   create_table "contracts", force: :cascade do |t|
     t.text "content"
     t.string "contract_type"
@@ -21,4 +30,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_04_07_143915) do
     t.string "llm_provider", default: "Gemini", null: false
     t.json "summary_json"
   end
+
+  add_foreign_key "contract_prompts", "contracts"
 end
